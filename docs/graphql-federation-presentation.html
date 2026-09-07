@@ -1,0 +1,703 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GraphQL Federation — Subgraphs, Supergraph & Router</title>
+<style>
+:root{
+  --purple:#2D1B4E; --purple-light:#4A3270; --lavender:#F6F3FC; --lavender-2:#EDE7F8;
+  --pink:#E10098; --pink-light:#FCE4F1; --teal:#0F6E56; --teal-light:#E1F5EE;
+  --amber:#854F0B; --amber-light:#FAEEDA; --gray:#5F5E5A; --gray-light:#F1EFE8;
+  --ink:#1E1730; --white:#FFFFFF;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{font-family:Calibri,Arial,sans-serif; color:var(--ink); background:var(--purple); overflow:hidden;}
+.deck{width:100vw; height:100vh; position:relative;}
+.slide{
+  position:absolute; inset:0; display:none; flex-direction:column;
+  padding:48px 76px 90px; background:var(--white); overflow-y:auto;
+}
+.slide.active{display:flex;}
+.slide.dark{background:var(--purple); color:var(--white);}
+.eyebrow{font-size:14px; letter-spacing:1.5px; text-transform:uppercase; color:var(--pink); font-weight:bold; margin-bottom:8px;}
+.dark .eyebrow{color:#F0A7D3;}
+h1{font-size:36px; font-weight:bold; color:var(--purple); margin-bottom:6px;}
+.dark h1{color:var(--white);}
+h2{font-size:22px; font-weight:bold; color:var(--purple); margin:16px 0 8px;}
+.dark h2{color:var(--white);}
+.subtitle{font-size:17px; color:var(--gray); margin-bottom:18px;}
+.dark .subtitle{color:#D8CDEF;}
+p, li{font-size:15px; line-height:1.5;}
+.body{flex:1; display:flex; flex-direction:column; gap:14px;}
+.row{display:flex; gap:22px; flex:1;}
+.col{flex:1; display:flex; flex-direction:column; gap:12px;}
+.card{background:var(--gray-light); border-radius:12px; padding:16px 18px;}
+.card.pink{background:var(--pink-light);}
+.card.teal{background:var(--teal-light);}
+.card.amber{background:var(--amber-light);}
+.card h3{font-size:15px; margin-bottom:6px; color:var(--purple);}
+.card.pink h3{color:#8A0A63;}
+.card.teal h3{color:var(--teal);}
+.card.amber h3{color:var(--amber);}
+.card p, .card li{font-size:13.5px; color:var(--ink);}
+ul{padding-left:20px;}
+li{margin-bottom:5px;}
+code, .code{font-family:"Courier New",monospace; font-size:12.5px; background:var(--purple); color:#EDE7F8; padding:2px 6px; border-radius:4px;}
+pre.code-block{font-family:"Courier New",monospace; font-size:12.5px; background:var(--purple); color:#EDE7F8; padding:14px 16px; border-radius:8px; overflow-x:auto; line-height:1.5; white-space:pre;}
+.title-slide{justify-content:center; align-items:flex-start;}
+.title-slide h1{font-size:52px;}
+.pill-row{display:flex; gap:12px; margin-top:24px;}
+.pill{background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.3); border-radius:20px; padding:8px 18px; font-size:14px;}
+.nav{position:fixed; bottom:20px; left:0; right:0; display:flex; justify-content:center; align-items:center; gap:16px; z-index:10;}
+.nav button{background:var(--purple); color:white; border:none; width:40px; height:40px; border-radius:50%; font-size:18px; cursor:pointer;}
+.nav button:disabled{opacity:0.3; cursor:default;}
+.dots{display:flex; gap:5px; flex-wrap:wrap; max-width:400px; justify-content:center;}
+.dot{width:7px; height:7px; border-radius:50%; background:#C9BEE5; cursor:pointer;}
+.dot.active{background:var(--pink); width:18px; border-radius:4px;}
+.counter{position:fixed; top:20px; right:28px; font-size:13px; color:var(--gray); background:var(--gray-light); padding:5px 12px; border-radius:12px; z-index:10;}
+.flow{display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
+.flow-box{background:var(--lavender-2); border:1px solid var(--purple-light); border-radius:8px; padding:10px 16px; font-size:14px; text-align:center; min-width:110px;}
+.flow-arrow{font-size:18px; color:var(--purple-light);}
+.tabs{display:flex; gap:6px; margin-bottom:12px; flex-wrap:wrap;}
+.tab-btn{padding:7px 14px; border-radius:8px; border:1px solid var(--purple); background:var(--white); color:var(--purple); cursor:pointer; font-size:13px; font-weight:bold;}
+.tab-btn.active{background:var(--purple); color:white;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+table{width:100%; border-collapse:collapse; font-size:13.5px;}
+th, td{text-align:left; padding:9px 10px; border-bottom:1px solid #E0DAF0;}
+th{color:var(--purple); font-size:12px; text-transform:uppercase; letter-spacing:0.5px;}
+.badge{display:inline-block; padding:3px 10px; border-radius:10px; font-size:12px; font-weight:bold;}
+.badge.entity{background:var(--teal-light); color:var(--teal);}
+.badge.value{background:var(--amber-light); color:var(--amber);}
+.checker{display:flex; gap:16px;}
+.type-btn{flex:1; background:var(--lavender-2); border:2px solid transparent; border-radius:10px; padding:16px; cursor:pointer; text-align:center; font-size:15px; font-weight:bold; color:var(--purple);}
+.type-btn.selected{border-color:var(--pink);}
+.verdict{margin-top:16px; padding:16px; border-radius:10px; display:none;}
+.verdict.show{display:block;}
+.step-flow{display:flex; flex-direction:column; gap:8px;}
+.step{background:var(--gray-light); border-radius:8px; padding:10px 14px; opacity:0.35; transition:all .25s; border-left:4px solid transparent; font-size:13.5px;}
+.step.active{opacity:1; background:var(--lavender-2); border-left:4px solid var(--pink);}
+.step-controls{margin-top:12px; display:flex; gap:10px; align-items:center;}
+.step-controls button{background:var(--purple); color:white; border:none; padding:8px 16px; border-radius:6px; cursor:pointer; font-size:13px;}
+.stepnum{font-size:13px; color:var(--gray);}
+.takeaway-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px;}
+.note{font-size:13px; color:var(--gray); font-style:italic; margin-top:10px;}
+.dark .note{color:#D8CDEF;}
+.diffnew{color:#7FE0B8;}
+</style>
+</head>
+<body>
+<div class="deck" id="deck">
+
+<section class="slide dark active title-slide">
+  <div class="eyebrow">Node.js session</div>
+  <h1>GraphQL Federation</h1>
+  <div class="subtitle" style="font-size:22px; color:#E9DEF7;">Subgraphs · Supergraph · Router</div>
+  <p style="color:#D8CDEF; max-width:560px; margin-top:8px;">A working session built on a real project: a library management schema with Book, Author, User and Lend — split, composed, and routed.</p>
+  <div class="pill-row">
+    <div class="pill">Quick recap</div>
+    <div class="pill">3 core concepts</div>
+    <div class="pill">Real code, per step</div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Recap · 1 of 3</div>
+  <h1>What is GraphQL?</h1>
+  <div class="subtitle">The one-line version, before we split anything apart</div>
+  <div class="row">
+    <div class="col">
+      <div class="card pink">
+        <h3>One endpoint</h3>
+        <p>Every request — read or write — goes to a single URL, unlike REST's many endpoints per resource.</p>
+      </div>
+      <div class="card teal">
+        <h3>Client asks for exact shape</h3>
+        <p>The client specifies precisely which fields it wants; the server returns exactly that shape, nothing more.</p>
+      </div>
+      <div class="card amber">
+        <h3>Strongly typed schema</h3>
+        <p>Every type and field is declared up front, so the contract between client and server is explicit and validated.</p>
+      </div>
+    </div>
+    <div class="col" style="justify-content:center;">
+      <div class="flow" style="flex-direction:column; align-items:flex-start;">
+        <div class="flow-box">Client query</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-box">GraphQL server</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-box">Resolvers</div>
+        <div class="flow-arrow">↓</div>
+        <div class="flow-box">Data source (DB / API)</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Recap · 2 of 3</div>
+  <h1>Schema building blocks</h1>
+  <div class="subtitle">Our actual typeDef — the one we're about to split</div>
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="t1">Full typeDef</button>
+    <button class="tab-btn" data-tab="t2">Query type</button>
+    <button class="tab-btn" data-tab="t3">Mutation (not yet present)</button>
+  </div>
+  <div class="tab-panel active" id="t1">
+    <p style="margin-bottom:8px;">This is the exact schema we're working from — one file, four types.</p>
+    <pre class="code-block">export const typeDefs = \`#graphql
+  type Book {
+    id: ID!
+    title: String!
+    authorId: ID!
+    copiesCount: Int!
+  }
+
+  type Author {
+    id: ID!
+    name: String!
+    description: String
+    books: [Book!]!
+  }
+
+  type User {
+    id: ID!
+    name: String!
+    email: String!
+    password: String!
+    borrowedBooks: [Book!]!
+  }
+
+  type Lend {
+    id: ID!
+    bookId: ID!
+    userId: ID!
+    lendDate: String!
+    returnDate: String
+  }
+\`</pre>
+  </div>
+  <div class="tab-panel" id="t2">
+    <p style="margin-bottom:8px;">Read operations — every field our current schema exposes, all under one Query type.</p>
+    <pre class="code-block">type Query {
+  books: [Book!]!
+  book(id: ID!): Book
+  authors: [Author!]!
+  author(id: ID!): Author
+  users: [User!]!
+  user(id: ID!): User
+  transactions: [Lend!]!
+  transaction(id: ID!): Lend
+}</pre>
+  </div>
+  <div class="tab-panel" id="t3">
+    <p style="margin-bottom:8px;">Our current typeDef has no Mutation type — it's Query-only. Here's a reasonable shape for the write operations this schema implies, so the recap is complete:</p>
+    <pre class="code-block">type Mutation {
+  addBook(title: String!, authorId: ID!, copiesCount: Int!): Book!
+  addAuthor(name: String!, description: String): Author!
+  registerUser(name: String!, email: String!, password: String!): User!
+
+  lendBook(bookId: ID!, userId: ID!): Lend!
+  returnBook(lendId: ID!): Lend!
+}</pre>
+    <p class="note">lendBook / returnBook matter most for the Router example later — they're the write path into the same Lend type we'll query.</p>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Recap · 3 of 3</div>
+  <h1>How a single-server request resolves</h1>
+  <div class="subtitle">The baseline flow — this is what changes once we federate</div>
+  <div class="body">
+    <div class="flow">
+      <div class="flow-box">Parse query</div><div class="flow-arrow">→</div>
+      <div class="flow-box">Validate vs schema</div><div class="flow-arrow">→</div>
+      <div class="flow-box">Build execution plan</div><div class="flow-arrow">→</div>
+      <div class="flow-box">Run resolvers</div><div class="flow-arrow">→</div>
+      <div class="flow-box">Return JSON</div>
+    </div>
+    <div class="card">
+      <h3>The catch at scale</h3>
+      <p>One server, one schema, one team's resolvers for everything — Book, Author, User, Lend all live in the same codebase, same file. That's fine for a small project. It breaks down as the schema and the team grow, which is exactly the problem federation solves.</p>
+    </div>
+  </div>
+</section>
+
+<section class="slide dark">
+  <div class="eyebrow">Why federation</div>
+  <h1>The monolith problem</h1>
+  <div class="subtitle" style="color:#D8CDEF;">What happens when one GraphQL schema keeps growing</div>
+  <div class="row">
+    <div class="col">
+      <div class="card"><h3>One deploy unit</h3><p>A typo in the Author resolver blocks shipping a fix to Lending. Everything ships together, or nothing does.</p></div>
+      <div class="card"><h3>Team collisions</h3><p>Multiple teams editing one schema file means merge conflicts and no clear ownership boundary.</p></div>
+    </div>
+    <div class="col">
+      <div class="card"><h3>Scaling is all-or-nothing</h3><p>If only Lending is under heavy load, you still have to scale the entire monolithic server.</p></div>
+      <div class="card"><h3>Schema sprawl</h3><p>Every domain's types pile into one file — Book, Author, User, Lend, and whatever comes next.</p></div>
+    </div>
+  </div>
+  <p style="margin-top:12px; color:#E9DEF7;">Federation splits the schema by domain, into independently owned, independently deployed services — while clients still see one graph.</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Concept 1 of 3</div>
+  <h1>Subgraphs</h1>
+  <div class="subtitle">An individual GraphQL service owning one domain of the schema</div>
+  <div class="row">
+    <div class="col">
+      <div class="card pink">
+        <h3>Why it's used</h3>
+        <p>Each domain (Books, Authors, Users, Lending) becomes its own service with its own codebase, DB, deploy pipeline and team ownership.</p>
+      </div>
+      <div class="card teal">
+        <h3>Effective vs traditional approach</h3>
+        <p>A traditional split means separate REST APIs the client stitches together itself, or a hand-rolled gateway. Subgraphs use directives (<code>@key</code>) so entities can be extended across services automatically, with one client-facing graph.</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>When it's ideal</h3>
+        <ul>
+          <li>Multiple teams own different domains</li>
+          <li>Domains scale and deploy at different rates</li>
+          <li>Schema has grown too large for one service</li>
+        </ul>
+      </div>
+      <div class="card amber">
+        <h3>Disadvantages</h3>
+        <ul>
+          <li>More infrastructure — N services instead of 1</li>
+          <li>Cross-subgraph queries add network hops</li>
+          <li>Requires discipline around entity ownership</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Concept 1 · code walkthrough</div>
+  <h1>Converting the typeDef into subgraphs</h1>
+  <div class="subtitle">Click each service to see exactly what its schema file looks like</div>
+  <div class="tabs" id="sgTabs">
+    <button class="tab-btn active" data-tab="sg1">authors-subgraph</button>
+    <button class="tab-btn" data-tab="sg2">books-subgraph</button>
+    <button class="tab-btn" data-tab="sg3">users-subgraph</button>
+    <button class="tab-btn" data-tab="sg4">lending-subgraph</button>
+    <button class="tab-btn" data-tab="sg5">project structure</button>
+  </div>
+  <div class="tab-panel active" id="sg1">
+    <p style="margin-bottom:6px;">Owns <code>Author</code> completely — unchanged fields, one new directive.</p>
+    <pre class="code-block">type Author <span class="diffnew">@key(fields: "id")</span> {
+  id: ID!
+  name: String!
+  description: String
+  <span class="diffnew">/* "books" removed — books-subgraph owns it now */</span>
+}
+
+type Query {
+  authors: [Author!]!
+  author(id: ID!): Author
+}</pre>
+  </div>
+  <div class="tab-panel" id="sg2">
+    <p style="margin-bottom:6px;">Owns <code>Book</code>, and separately extends <code>Author</code> to add back the <code>books</code> field it just lost.</p>
+    <pre class="code-block">type Book <span class="diffnew">@key(fields: "id")</span> {
+  id: ID!
+  title: String!
+  authorId: ID!
+  copiesCount: Int!
+}
+
+<span class="diffnew">extend type Author @key(fields: "id") {
+  id: ID! @external
+  books: [Book!]!        # resolved here: books where authorId = id
+}</span>
+
+type Query {
+  books: [Book!]!
+  book(id: ID!): Book
+}</pre>
+  </div>
+  <div class="tab-panel" id="sg3">
+    <p style="margin-bottom:6px;">Owns <code>User</code> — same pattern as authors-subgraph: fields unchanged, <code>borrowedBooks</code> removed (lending-subgraph adds it back).</p>
+    <pre class="code-block">type User <span class="diffnew">@key(fields: "id")</span> {
+  id: ID!
+  name: String!
+  email: String!
+  password: String!
+  <span class="diffnew">/* "borrowedBooks" removed — lending-subgraph owns it now */</span>
+}
+
+type Query {
+  users: [User!]!
+  user(id: ID!): User
+}</pre>
+  </div>
+  <div class="tab-panel" id="sg4">
+    <p style="margin-bottom:6px;">Owns <code>Lend</code> fully, and extends both <code>User</code> and <code>Book</code> to reconnect them.</p>
+    <pre class="code-block">type Lend {
+  id: ID!
+  bookId: ID!
+  userId: ID!
+  lendDate: String!
+  returnDate: String
+}
+<span class="diffnew">/* Lend has NO @key — nothing outside this subgraph
+   ever needs to reference a specific Lend by id */</span>
+
+<span class="diffnew">extend type User @key(fields: "id") {
+  id: ID! @external
+  borrowedBooks: [Book!]!   # resolved from Lend rows for this userId
+}
+
+extend type Book @key(fields: "id") {
+  id: ID! @external
+}</span>
+
+type Query {
+  transactions: [Lend!]!
+  transaction(id: ID!): Lend
+}</pre>
+  </div>
+  <div class="tab-panel" id="sg5">
+    <p style="margin-bottom:6px;">Four standalone services, one repo via npm workspaces (could just as easily be four repos).</p>
+    <pre class="code-block">graphql-federation-library/
+├── subgraphs/
+│   ├── authors/
+│   │   ├── src/
+│   │   │   ├── schema.ts
+│   │   │   ├── resolvers.ts
+│   │   │   └── index.ts        # Apollo Server on :4001
+│   │   └── package.json
+│   ├── books/
+│   │   ├── src/
+│   │   │   ├── schema.ts
+│   │   │   ├── resolvers.ts    # includes __resolveReference for Author
+│   │   │   └── index.ts        # :4002
+│   │   └── package.json
+│   ├── users/
+│   │   ├── src/...
+│   │   └── package.json        # :4003
+│   └── lending/
+│       ├── src/...
+│       └── package.json        # :4004
+├── router/
+│   ├── supergraph.graphql       # generated, see next section
+│   ├── router.yaml
+│   └── package.json
+├── package.json                 # npm workspaces root
+└── tsconfig.base.json</pre>
+  </div>
+  <p class="note">Rule to remember: extension is flat, never a chain. books-subgraph and lending-subgraph never talk to each other — each independently extends the type it needs.</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Concept 1 · deciding boundaries</div>
+  <h1>Value type or entity?</h1>
+  <div class="subtitle">Click a type from our schema to see the verdict and why</div>
+  <div class="checker" id="checker">
+    <div class="type-btn" data-type="author">Author</div>
+    <div class="type-btn" data-type="book">Book</div>
+    <div class="type-btn" data-type="user">User</div>
+    <div class="type-btn" data-type="lend">Lend</div>
+  </div>
+  <div class="verdict card" id="verdict"></div>
+  <div class="card" style="margin-top:auto;">
+    <h3>The one question that decides it</h3>
+    <p>Does more than one subgraph need to attach data to the <em>same instance</em> of this type? If yes → entity, needs <code>@key</code>. If no → value type, plain GraphQL, no directive.</p>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Concept 2 of 3</div>
+  <h1>Supergraph</h1>
+  <div class="subtitle">The single composed schema describing the entire graph</div>
+  <div class="row">
+    <div class="col">
+      <div class="card pink">
+        <h3>Why it's used</h3>
+        <p>Composition merges all subgraph schemas into one SDL, recording which subgraph resolves which field — the map the Router will use.</p>
+      </div>
+      <div class="card teal">
+        <h3>Effective vs traditional approach</h3>
+        <p>Without it, you'd need to manually keep a hand-written unified schema in sync with N independent services. Composition generates and validates it automatically, every time a subgraph changes.</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>When it's ideal</h3>
+        <ul>
+          <li>Any time you have more than one subgraph</li>
+          <li>You want CI to catch breaking schema changes early</li>
+        </ul>
+      </div>
+      <div class="card amber">
+        <h3>Disadvantages</h3>
+        <ul>
+          <li>Extra build step in your CI/CD pipeline</li>
+          <li>Composition errors (e.g. unshared duplicate fields) need understanding to debug</li>
+          <li>It's a static artifact — must be regenerated on every schema change</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Concept 2 · code walkthrough</div>
+  <h1>Composing with Rover</h1>
+  <div class="subtitle">Two files and one command turn four schemas into a supergraph</div>
+  <div class="tabs" id="rvTabs">
+    <button class="tab-btn active" data-tab="rv1">supergraph-config.yaml</button>
+    <button class="tab-btn" data-tab="rv2">compose command</button>
+    <button class="tab-btn" data-tab="rv3">composed output</button>
+  </div>
+  <div class="tab-panel active" id="rv1">
+    <pre class="code-block">federation_version: 2
+subgraphs:
+  authors:
+    routing_url: http://localhost:4001/graphql
+    schema:
+      subgraph_url: http://localhost:4001/graphql
+  books:
+    routing_url: http://localhost:4002/graphql
+    schema:
+      subgraph_url: http://localhost:4002/graphql
+  users:
+    routing_url: http://localhost:4003/graphql
+    schema:
+      subgraph_url: http://localhost:4003/graphql
+  lending:
+    routing_url: http://localhost:4004/graphql
+    schema:
+      subgraph_url: http://localhost:4004/graphql</pre>
+  </div>
+  <div class="tab-panel" id="rv2">
+    <p style="margin-bottom:8px;">This reads the config, pulls each subgraph's schema, validates directives, and writes the merged SDL.</p>
+    <pre class="code-block">rover supergraph compose \
+  --config ./supergraph-config.yaml \
+  > supergraph.graphql</pre>
+  </div>
+  <div class="tab-panel" id="rv3">
+    <p style="margin-bottom:8px;">Author merged from two subgraphs — no trace of which one contributed which field.</p>
+    <pre class="code-block">type Author {
+  id: ID!
+  name: String!          # from authors-subgraph
+  description: String    # from authors-subgraph
+  books: [Book!]!         # from books-subgraph
+}</pre>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Concept 2 · tooling</div>
+  <h1>Why Rover, and what else exists</h1>
+  <div class="subtitle">Rover is the CLI; here's what it actually does and its alternatives</div>
+  <div class="card teal" style="margin-bottom:14px;">
+    <h3>What Rover does</h3>
+    <p><strong>Compose</strong> — merge N subgraph schemas into one supergraph SDL. <strong>Check</strong> — validate a schema change won't break composition or existing client queries, before merging. <strong>Publish</strong> — push a subgraph's schema to Apollo GraphOS for managed federation, where routers pull updates automatically.</p>
+  </div>
+  <table>
+    <tr><th>Tool</th><th>What it is</th></tr>
+    <tr><td>Apollo GraphOS</td><td>Not a Rover alternative — its cloud companion. Rover is the CLI, GraphOS is managed federation (schema registry + auto-push to routers).</td></tr>
+    <tr><td>Mercurius Federation</td><td>Federation support built into Fastify's GraphQL library — an alternative to the whole Apollo stack for Node-first teams.</td></tr>
+    <tr><td>WunderGraph Cosmo</td><td>Open-source, self-hostable router + registry + composition — avoids Apollo vendor lock-in.</td></tr>
+    <tr><td>The Guild's Hive</td><td>Open-source schema registry, an alternative to GraphOS specifically.</td></tr>
+    <tr><td>GraphQL Fusion</td><td>An upcoming vendor-neutral spec aiming to standardize federation itself.</td></tr>
+  </table>
+  <p class="note">One-line answer for "why Rover": it's the reference tooling for Apollo Federation — the spec our subgraphs use — but the open-source alternatives exist for teams who want managed federation without Apollo's paid tier.</p>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Concept 3 of 3</div>
+  <h1>Router</h1>
+  <div class="subtitle">The runtime service that is the one GraphQL endpoint clients call</div>
+  <div class="row">
+    <div class="col">
+      <div class="card pink">
+        <h3>Why it's used</h3>
+        <p>Loads the supergraph, plans each incoming query across subgraphs, executes the sub-requests, and merges results into one response.</p>
+      </div>
+      <div class="card teal">
+        <h3>Effective vs traditional approach</h3>
+        <p>A hand-built API gateway needs custom stitching logic per query shape. The Router generates a query plan automatically from the supergraph — no per-query code to maintain.</p>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card">
+        <h3>When it's ideal</h3>
+        <ul>
+          <li>Clients should see one graph, not N services</li>
+          <li>Query shapes vary and change often</li>
+        </ul>
+      </div>
+      <div class="card amber">
+        <h3>Disadvantages</h3>
+        <ul>
+          <li>Single point of failure if not made highly available</li>
+          <li>Adds latency — extra hop plus fan-out calls</li>
+          <li>Debugging a slow query means reading a query plan, not just one stack trace</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Concept 3 · example</div>
+  <h1>One request, step by step</h1>
+  <div class="subtitle"><code>author(id) { name books { title copiesCount } }</code></div>
+  <div class="step-flow" id="stepflow">
+    <div class="step active">1. Client sends the query to the Router — the only endpoint it knows.</div>
+    <div class="step">2. Router builds a query plan from the supergraph schema.</div>
+    <div class="step">3. Router calls authors-subgraph for <code>name</code> and the entity key.</div>
+    <div class="step">4. Router sends that key to books-subgraph as an entity representation.</div>
+    <div class="step">5. books-subgraph resolves <code>books</code> via <code>__resolveReference</code>.</div>
+    <div class="step">6. Router merges both results into one response shape.</div>
+    <div class="step">7. Client receives a single JSON response.</div>
+  </div>
+  <div class="step-controls">
+    <button id="stepPrev">◀ Prev step</button>
+    <button id="stepNext">Next step ▶</button>
+    <span class="stepnum" id="stepnum">Step 1 of 7</span>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Concept 3 · code walkthrough</div>
+  <h1>Running the router, and what resolves the fan-out</h1>
+  <div class="subtitle">The router binary's config, and the resolver that makes extension work</div>
+  <div class="tabs" id="rtTabs">
+    <button class="tab-btn active" data-tab="rt1">router.yaml + start</button>
+    <button class="tab-btn" data-tab="rt2">__resolveReference</button>
+  </div>
+  <div class="tab-panel active" id="rt1">
+    <pre class="code-block"># router.yaml
+supergraph:
+  listen: 0.0.0.0:4000
+include_subgraph_errors:
+  all: true</pre>
+    <pre class="code-block" style="margin-top:10px;">./router --supergraph ./supergraph.graphql --config ./router.yaml</pre>
+    <p class="note">Apollo Router is a standalone Rust binary — not a Node process — even though every subgraph here is Node. It boots on :4000, the one URL our React frontend would ever call.</p>
+  </div>
+  <div class="tab-panel" id="rt2">
+    <p style="margin-bottom:8px;">Lives in books-subgraph. Given just an id, it looks up that author's books locally.</p>
+    <pre class="code-block">const resolvers = {
+  Author: {
+    __resolveReference(reference) {
+      // reference = { __typename: "Author", id: "a1" }
+      // sent by the Router — books-subgraph only needs the id
+      return { id: reference.id };
+    },
+    books(author) {
+      return db.books.filter(b => b.authorId === author.id);
+    }
+  }
+};</pre>
+  </div>
+</section>
+
+<section class="slide">
+  <div class="eyebrow">Quick summary</div>
+  <h1>Subgraph vs Supergraph vs Router</h1>
+  <table>
+    <tr><th>Concept</th><th>What it is</th><th>Runs at</th><th>Analogy</th></tr>
+    <tr><td><span class="badge entity">Subgraph</span></td><td>An independent GraphQL service owning one domain</td><td>Runtime — its own server</td><td>One department in a company</td></tr>
+    <tr><td><span class="badge value">Supergraph</span></td><td>The composed schema of all subgraphs merged together</td><td>Build time — a static artifact</td><td>The company org chart</td></tr>
+    <tr><td><span class="badge entity">Router</span></td><td>The runtime engine that plans and executes queries across subgraphs</td><td>Runtime — the front door</td><td>The company's single reception desk</td></tr>
+  </table>
+  <div class="card" style="margin-top:20px;">
+    <h3>The chain, in one line</h3>
+    <p>Subgraphs (own schemas) → composition → Supergraph (one schema, static) → Router (runtime, uses the supergraph to serve live queries).</p>
+  </div>
+</section>
+
+<section class="slide dark">
+  <div class="eyebrow">Wrap-up</div>
+  <h1>Key takeaways</h1>
+  <div class="takeaway-grid">
+    <div class="card"><h3 style="color:var(--pink);">Subgraphs</h3><p>Split by domain. Entities need <code>@key</code>; value types don't. Extension is always flat, never chained.</p></div>
+    <div class="card"><h3 style="color:var(--pink);">Supergraph</h3><p>A build artifact, not a service. Regenerate it whenever a subgraph schema changes. Rover composes it; GraphOS/Cosmo/Hive manage it at scale.</p></div>
+    <div class="card"><h3 style="color:var(--pink);">Router</h3><p>The single endpoint clients see. It plans, fans out, and merges — automatically, per query.</p></div>
+  </div>
+  <p style="margin-top:24px; color:#D8CDEF;">Next step: scaffold the four subgraphs, compose with Rover, run the Router against a live query.</p>
+</section>
+
+</div>
+
+<div class="counter" id="counter">1 / 14</div>
+<div class="nav">
+  <button id="prevBtn">‹</button>
+  <div class="dots" id="dots"></div>
+  <button id="nextBtn">›</button>
+</div>
+
+<script>
+const slides = document.querySelectorAll('.slide');
+const total = slides.length;
+let current = 0;
+const dotsEl = document.getElementById('dots');
+slides.forEach((s,i)=>{
+  const d = document.createElement('div');
+  d.className = 'dot' + (i===0?' active':'');
+  d.addEventListener('click', ()=>goTo(i));
+  dotsEl.appendChild(d);
+});
+function render(){
+  slides.forEach((s,i)=> s.classList.toggle('active', i===current));
+  document.querySelectorAll('.dot').forEach((d,i)=> d.classList.toggle('active', i===current));
+  document.getElementById('counter').textContent = (current+1)+' / '+total;
+  document.getElementById('prevBtn').disabled = current===0;
+  document.getElementById('nextBtn').disabled = current===total-1;
+}
+function goTo(i){ current = Math.max(0, Math.min(total-1, i)); render(); }
+document.getElementById('prevBtn').addEventListener('click', ()=>goTo(current-1));
+document.getElementById('nextBtn').addEventListener('click', ()=>goTo(current+1));
+document.addEventListener('keydown', (e)=>{
+  if(e.key==='ArrowRight') goTo(current+1);
+  if(e.key==='ArrowLeft') goTo(current-1);
+});
+render();
+
+document.querySelectorAll('.tabs').forEach(group=>{
+  group.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      group.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      const panelContainer = group.parentElement;
+      panelContainer.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+      document.getElementById(btn.dataset.tab).classList.add('active');
+    });
+  });
+});
+
+const verdicts = {
+  author: {cls:'entity', title:'Entity type', text:'books-subgraph extends Author to add the "books" field. A second subgraph attaches data to the same instance, so Author needs @key(fields: "id").'},
+  book: {cls:'entity', title:'Entity type', text:'lending-subgraph references Book (via bookId, and inside borrowedBooks). Since another subgraph needs to resolve a real Book from just an id, Book needs @key(fields: "id").'},
+  user: {cls:'entity', title:'Entity type', text:'lending-subgraph extends User to add "borrowedBooks". Same rule as Author — needs @key(fields: "id").'},
+  lend: {cls:'value', title:'Value type', text:'No other subgraph ever needs to reference a specific Lend by id. It is fully owned and fully resolved by lending-subgraph alone — no @key needed.'}
+};
+document.querySelectorAll('.type-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('selected'));
+    btn.classList.add('selected');
+    const v = verdicts[btn.dataset.type];
+    const el = document.getElementById('verdict');
+    el.className = 'card verdict show ' + (v.cls==='entity' ? 'teal' : 'amber');
+    el.innerHTML = '<h3>'+v.title+'</h3><p>'+v.text+'</p>';
+  });
+});
+
+const steps = document.querySelectorAll('#stepflow .step');
+let stepIdx = 0;
+function renderStep(){
+  steps.forEach((s,i)=> s.classList.toggle('active', i===stepIdx));
+  document.getElementById('stepnum').textContent = 'Step '+(stepIdx+1)+' of '+steps.length;
+}
+document.getElementById('stepNext').addEventListener('click', ()=>{ stepIdx = Math.min(steps.length-1, stepIdx+1); renderStep(); });
+document.getElementById('stepPrev').addEventListener('click', ()=>{ stepIdx = Math.max(0, stepIdx-1); renderStep(); });
+</script>
+</body>
+</html>

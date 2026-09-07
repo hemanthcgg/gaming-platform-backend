@@ -1,0 +1,18 @@
+federation_version: =2.7.0
+
+subgraphs:
+
+  games:
+    routing_url: http://localhost:4001
+    schema:
+      file: ./games/src/schema.graphql
+
+  users:
+    routing_url: http://localhost:4002
+    schema:
+      file: ./users/src/schema.graphql
+
+  reviews:
+    routing_url: http://localhost:4003
+    schema:
+      file: ./reviews/src/schema.graphql

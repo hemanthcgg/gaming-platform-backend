@@ -1,0 +1,15 @@
+import { gql } from "graphql-tag";
+
+export const typeDefs = gql`
+  type Game @key(fields: "id") {
+    id: ID!
+    title: String!
+    price: Float!
+    genre: String!
+  }
+
+  type Query {
+    games: [Game!]!
+    game(id: ID!): Game
+  }
+`;
