@@ -7,5 +7,11 @@ export const resolvers = {
     review: (_parent: unknown, args: { id: string }) => {
       return reviews.find((review) => review.id === args.id);
     }
+  },
+
+  Game: {
+    reviews: (game: { id: string }) => {
+      return reviews.filter((review) => review.gameId === game.id);
+    }
   }
 };

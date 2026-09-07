@@ -1,3 +1,14 @@
+extend schema
+  @link(
+    url: "https://specs.apollo.dev/federation/v2.7"
+    import: ["@key", "@external"]
+  )
+
+extend type Game @key(fields: "id") {
+  id: ID! @external
+  reviews: [Review!]!
+}
+
 type Review {
   id: ID!
   rating: Int!
